@@ -181,6 +181,14 @@ appear the bike is pulling the text around.
 
 shows a simple animation of a slowly beating heart on the first message, and a blinking heart on the second message.
 
+    python ./led-badge-11x44.py -m4 ":path/to/art.txt:"
+
+You can embed a simple ASCII art text file directly; the tool will auto-convert it
+to a bitmap before upload. The file format uses a `+---+` top/bottom border,
+`| ... |` side borders, and `#` for lit pixels (spaces are off). Width can exceed
+44 for scrolling/animation; height is clipped/padded to the badge height (11 for
+11x44, 12 for 12x48).
+
     ./led-badge-11x44.py -B 50 -m 0 -s 8 "Bonjour à toutes et à tous" "Bienvenu(e)s en Master 2 EEA ISHM" "Ingénierie des systèmes Humains Machines" "Bonne réussite à votre promotion 2023-2024"
 
 ![M2 ishm](photos/m2ishm.gif)

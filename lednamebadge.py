@@ -94,6 +94,7 @@ import sys
 import time
 from array import array
 from datetime import datetime
+from math import ceil
 
 
 __version = "0.14"
@@ -367,6 +368,9 @@ class SimpleTextAndIcons:
                 return ':'
             if re.match('^[0-9]*$', name):  # py3 name.isdecimal()
                 return chr(int(name))
+            if name.lower().endswith('.txt'):
+                self.bitmap_preloaded.append(SimpleTextAndIcons.bitmap_ascii(name))
+                return chr(len(self.bitmap_preloaded) - 1)
             if '.' in name:
                 self.bitmap_preloaded.append(SimpleTextAndIcons.bitmap_img(name))
                 return chr(len(self.bitmap_preloaded) - 1)
@@ -428,8 +432,59 @@ class SimpleTextAndIcons:
             Otherwise, we take it as a string (with ":"-notation, see bitmap_text()).
         """
         if os.path.exists(arg):
+            if arg.lower().endswith('.txt'):
+                return SimpleTextAndIcons.bitmap_ascii(arg)
             return SimpleTextAndIcons.bitmap_img(arg)
         return self.bitmap_text(arg)
+
+    @staticmethod
+    def bitmap_ascii(txt_path, max_height=11):
+        """Convert a simple ASCII art file (+-| border, # pixels) into a bitmap buffer.
+        Falls back to using generate_from_ascii helpers if available, otherwise does a lightweight parse here.
+        """
+        try:
+            import generate_from_ascii as gfa  # type: ignore
+            width, height, interior = gfa.parse_ascii(txt_path)
+        except Exception:
+            # Minimal inline parser to avoid hard dependency failures.
+            with open(txt_path, "r", encoding="utf-8") as f:
+                lines = [ln.rstrip("\n") for ln in f]
+            if len(lines) < 3:
+                sys.exit("ASCII file too small; need top, content, bottom lines.")
+            top = lines[0]
+            bottom = lines[-1]
+            interior = lines[1:-1]
+            if len(top) < 3 or top[0] != "+" or top[-1] != "+" or set(top[1:-1]) != {"-"}:
+                sys.exit("Top border must be '+---...---+'.")
+            if bottom != top:
+                sys.exit("Bottom border must match the top border.")
+            width = len(top) - 2
+            for idx, row in enumerate(interior, start=1):
+                if len(row) != len(top):
+                    sys.exit(f"Line {idx+1} length mismatch; expected {len(top)}.")
+                if row[0] != "|" or row[-1] != "|":
+                    sys.exit(f"Line {idx+1} must start/end with '|'.")
+            height = len(interior)
+
+        # Clip/pad height to target
+        target_h = max_height
+        rows = interior[:target_h]
+        while len(rows) < target_h:
+            rows.append("|" + " " * width + "|")
+
+        cols = int(ceil(width / 8))
+        buf = array('B')
+        for col in range(cols):
+            for row_idx in range(target_h):
+                byte_val = 0
+                content = rows[row_idx][1:-1]  # strip borders
+                for bit in range(8):
+                    x = 8 * col + bit
+                    if x < width and content[x] == '#':
+                        byte_val |= 1 << (7 - bit)
+                buf.append(byte_val)
+
+        return buf, cols
 
 
 class WriteMethod:
